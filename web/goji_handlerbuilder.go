@@ -9,7 +9,7 @@ import (
 )
 
 type GojiHandlerBuilder struct {
-	NewContext func(*web.C, http.ResponseWriter, *http.Request, coa.ActionGroup) coa.Context
+	NewContext func(*web.C, http.ResponseWriter, *http.Request, coa.ActionGroup) Context
 }
 
 func (ab *GojiHandlerBuilder) Build(zeroActionGroup interface{}) func(web.C, http.ResponseWriter, *http.Request) {
@@ -20,6 +20,7 @@ func (ab *GojiHandlerBuilder) Build(zeroActionGroup interface{}) func(web.C, htt
 
 	return func(c web.C, w http.ResponseWriter, r *http.Request) {
 		ag := reflect.New(actionType).Interface().(coa.ActionGroup)
-		coa.Exec(ab.NewContext(&c, w, r, ag))
+		ctx := ab.NewContext(&c, w, r, ag)
+		coa.Exec(ag, ctx)
 	}
 }

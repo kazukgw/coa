@@ -8,7 +8,7 @@ import (
 )
 
 type GinHandlerBuilder struct {
-	NewContext func(*gin.Context, coa.ActionGroup) coa.Context
+	NewContext func(*gin.Context, coa.ActionGroup) Context
 }
 
 func (ab *GinHandlerBuilder) Build(zeroActionGroup interface{}) func(*gin.Context) {
@@ -19,6 +19,7 @@ func (ab *GinHandlerBuilder) Build(zeroActionGroup interface{}) func(*gin.Contex
 
 	return func(c *gin.Context) {
 		ag := reflect.New(actionType).Interface().(coa.ActionGroup)
-		coa.Exec(ab.NewContext(c, ag))
+		ctx := ab.NewContext(c, ag)
+		coa.Exec(ag, ctx)
 	}
 }

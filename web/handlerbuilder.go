@@ -19,6 +19,7 @@ func (ab *HandlerBuilder) Build(zeroActionGroup interface{}) func(http.ResponseW
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ag := reflect.New(actionType).Interface().(coa.ActionGroup)
-		coa.Exec(ab.NewContext(w, r, ag))
+		ctx := ab.NewContext(w, r, ag)
+		coa.Exec(ag, ctx)
 	}
 }

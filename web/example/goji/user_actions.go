@@ -1,6 +1,8 @@
 package main
 
-import "github.com/kazukgw/coa"
+import (
+	"github.com/kazukgw/coa"
+)
 
 // Fieldの上から順にAction interface を実装するものが実行される
 type GetUser struct {

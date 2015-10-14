@@ -1,7 +1,7 @@
+// Package coa provides the action executor and interfaces for composable action.
 package coa
 
 import (
-	"net/http"
 	"reflect"
 	"sync"
 )
@@ -12,52 +12,50 @@ type Action interface {
 
 type ActionGroup interface {
 	Action
-	HandleError(Context, error)
+	HandleError(Context, error) error
 }
 
+// PreExec() will be executed before every action excute.
 type HasPreExec interface {
 	ActionGroup
 	PreExec(Context) error
 }
 
+// PostExec() will be executed after every action excute.
+// But if error handler of the ActionGroup return error,
+// PostExec will not be excuted.
 type HasPostExec interface {
 	ActionGroup
 	PostExec(Context) error
 }
 
+// If a ActionGroup implements this interface,
+// every action will be executed in parallel.
 type Parallelable interface {
 	ActionGroup
 	HandleErrorParallel(Context, error)
 	Error() error
 }
 
+// If a ActionGroup implements this interface,
+// Repeat() will be executed after every action execute. And if Repeat() return
+// true, every action will be executed again.
 type Repeatable interface {
 	ActionGroup
-	Repeate() bool
+	Repeat() bool
 }
 
+// Context is the interface that wrap the ActionGroup Getter function.
 type Context interface {
-	ResponseWriter() http.ResponseWriter
-	Request() *http.Request
 	ActionGroup() ActionGroup
-	Logger() Logger
 }
 
-type Logger interface {
-	Info(...interface{})
-	Warning(...interface{})
-	Error(...interface{})
-	Panic(...interface{})
-	Fatal(...interface{})
-}
-
+// If A ActionGroup has DoSelf as field,
+// the Exec function execute Do() of the ActionGroup.
 type DoSelf struct{}
 
-func Exec(ctx Context) error {
-	return exec(ctx, ctx.ActionGroup())
-}
-
-func exec(ctx Context, ag ActionGroup) error {
+// exec Execute Actions in the ActionGroup with Context.
+func Exec(ag ActionGroup, ctx Context) error {
 	agValue := reflect.ValueOf(ag).Elem()
 
 	paralellableAG, parallelable := ag.(Parallelable)
@@ -65,8 +63,9 @@ func exec(ctx Context, ag ActionGroup) error {
 
 	if pe, ok := ag.(HasPreExec); ok {
 		if err := pe.PreExec(ctx); err != nil {
-			pe.HandleError(ctx, err)
-			return err
+			if err := pe.HandleError(ctx, err); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -75,9 +74,10 @@ func exec(ctx Context, ag ActionGroup) error {
 			var wg sync.WaitGroup
 			for i := 0; i < agValue.NumField(); i++ {
 				wg.Add(1)
+				fieldIndex := i
 				go func() {
 					defer wg.Done()
-					field := agValue.FieldByIndex([]int{i}).Addr().Interface()
+					field := agValue.FieldByIndex([]int{fieldIndex}).Addr().Interface()
 					if err := execField(field, ctx, ag); err != nil {
 						paralellableAG.HandleErrorParallel(ctx, err)
 					}
@@ -85,20 +85,22 @@ func exec(ctx Context, ag ActionGroup) error {
 			}
 			wg.Wait()
 			if err := paralellableAG.Error(); err != nil {
-				ag.HandleError(ctx, err)
-				return err
+				if err := ag.HandleError(ctx, err); err != nil {
+					return err
+				}
 			}
 		} else {
 			for i := 0; i < agValue.NumField(); i++ {
 				field := agValue.FieldByIndex([]int{i}).Addr().Interface()
 				if err := execField(field, ctx, ag); err != nil {
-					ag.HandleError(ctx, err)
-					return err
+					if err := ag.HandleError(ctx, err); err != nil {
+						return err
+					}
 				}
 			}
 		}
 
-		if !repeatable || !repeatableAG.Repeate() {
+		if !repeatable || !repeatableAG.Repeat() {
 			break
 		}
 	}
@@ -115,7 +117,7 @@ func exec(ctx Context, ag ActionGroup) error {
 func execField(field interface{}, ctx Context, ag ActionGroup) error {
 	switch f := field.(type) {
 	case ActionGroup:
-		return exec(ctx, f)
+		return Exec(f, ctx)
 	case Action:
 		return f.Do(ctx)
 	case *DoSelf:

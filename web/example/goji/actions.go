@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/kazukgw/coa"
+	"github.com/kazukgw/coa/web"
 )
 
 type ResultActionHandler struct {
@@ -21,12 +22,14 @@ type ResultJSON struct {
 }
 
 func (r *ResultJSON) Do(ctx coa.Context) error {
+	wctx := ctx.(web.Context)
+
 	jsonStr, err := json.Marshal(r.Data)
 	if err != nil {
 		return err
 	}
 
-	w := ctx.ResponseWriter()
+	w := wctx.ResponseWriter()
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(r.Code)
 	_, err = w.Write(jsonStr)
@@ -41,7 +44,8 @@ type AuthenticateUserByHeaderToken struct {
 }
 
 func (auth *AuthenticateUserByHeaderToken) Do(ctx coa.Context) error {
-	r := ctx.Request()
+	wctx := ctx.(web.Context)
+	r := wctx.Request()
 	auth.AuthToken = r.Header.Get("X-Auth-Token")
 	u := FindUserByAuthToken(auth.AuthToken)
 	if u == nil {
@@ -59,9 +63,10 @@ type ParamsUnmarshaler struct {
 }
 
 func (pu *ParamsUnmarshaler) Do(ctx coa.Context) error {
-	act := ctx.ActionGroup()
+	wctx := ctx.(web.Context)
+	act := wctx.ActionGroup()
 	if hasP, ok := act.(HasParams); ok {
-		r := ctx.Request()
+		r := wctx.Request()
 		return json.NewDecoder(r.Body).Decode(hasP.Params())
 	}
 	return nil

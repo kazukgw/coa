@@ -1,18 +1,4 @@
-coa
-===============
-
-coa = **Co**mposable **A**ction
-
-Overview
---------------
-
-Package coa provides the action executor and interfaces for composable action.
-
-Example
---------------
-
-```go
-package main
+package coa_test
 
 import (
 	"fmt"
@@ -44,10 +30,19 @@ func (t2 ActionPrint2) Do(ctx coa.Context) error {
 	return nil
 }
 
+type ActionPrint3 struct {
+}
+
+func (t3 ActionPrint3) Do(ctx coa.Context) error {
+	fmt.Println(3)
+	return nil
+}
+
 type ActionGroup struct {
 	ActionPrint1
-	coa.DoSelf
 	ActionPrint2
+	coa.DoSelf
+	ActionPrint3
 }
 
 func (ag *ActionGroup) Do(ctx coa.Context) error {
@@ -56,16 +51,17 @@ func (ag *ActionGroup) Do(ctx coa.Context) error {
 }
 
 func (ag *ActionGroup) HandleError(ctx coa.Context, err error) error {
+	// handle error
 	return nil
 }
 
-func main() {
+func Example() {
 	ag := &ActionGroup{}
-	ctx := &Context{ag}
-	coa.Exec(ctx)
+	ctx := &Context{&ActionGroup{}}
+	coa.Exec(ag, ctx)
 	// Output:
 	// 1
-	// do
 	// 2
+	// do
+	// 3
 }
-```

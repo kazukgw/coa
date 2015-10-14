@@ -30,19 +30,14 @@ func FindUserByAuthToken(token string) *User {
 	return tokenMap[token]
 }
 
-func FindUserByUserID(id string) *User {
-	return idMap[id]
-}
-
 func SaveUser(u *User) error {
 	if u == nil {
 		return errors.New("user is nil")
 	}
-	updateUser := idMap[u.UserID]
-	if updateUser == nil {
+	updatedUser := idMap[u.UserID]
+	if updatedUser == nil {
 		return errors.New("user not found")
 	}
-	updateUser.Name = u.Name
-	updateUser.AuthToken = u.AuthToken
+	updatedUser.Name = u.Name
 	return nil
 }
