@@ -22,6 +22,11 @@ type ErrorGroup struct {
 	ActionPrint3
 }
 
+func (ag *ErrorGroup) PostExec(ctx coa.Context) error {
+	fmt.Println("post exec")
+	return nil
+}
+
 func (ag *ErrorGroup) Do(ctx coa.Context) error {
 	fmt.Println("do")
 	return nil
@@ -40,4 +45,5 @@ func Example_errorHandle() {
 	// 1
 	// 2
 	// error!
+	// post exec
 }

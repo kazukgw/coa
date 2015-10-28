@@ -45,6 +45,13 @@ type Repeatable interface {
 	Repeat() bool
 }
 
+// If a ActionGroup implements this interface,
+// ActionGroup recovers from a panic in execution of a action.
+type Recoverable interface {
+	ActionGroup
+	Recover(interface{})
+}
+
 // Context is the interface that wrap the ActionGroup Getter function.
 type Context interface {
 	ActionGroup() ActionGroup
@@ -61,6 +68,21 @@ func Exec(ag ActionGroup, ctx Context) error {
 	paralellableAG, parallelable := ag.(Parallelable)
 	repeatableAG, repeatable := ag.(Repeatable)
 
+	defer func() {
+		if r := recover(); r != nil {
+			if recoverable, ok := ag.(Recoverable); ok {
+				recoverable.Recover(r)
+			} else {
+				panic(r)
+			}
+		}
+		if pe, ok := ag.(HasPostExec); ok {
+			if err := pe.PostExec(ctx); err != nil {
+				pe.HandleError(ctx, err)
+			}
+		}
+	}()
+
 	if pe, ok := ag.(HasPreExec); ok {
 		if err := pe.PreExec(ctx); err != nil {
 			if err := pe.HandleError(ctx, err); err != nil {
@@ -69,6 +91,7 @@ func Exec(ag ActionGroup, ctx Context) error {
 		}
 	}
 
+	var agError error
 	for {
 		if parallelable {
 			var wg sync.WaitGroup
@@ -86,7 +109,8 @@ func Exec(ag ActionGroup, ctx Context) error {
 			wg.Wait()
 			if err := paralellableAG.Error(); err != nil {
 				if err := ag.HandleError(ctx, err); err != nil {
-					return err
+					agError = err
+					break
 				}
 			}
 		} else {
@@ -94,7 +118,8 @@ func Exec(ag ActionGroup, ctx Context) error {
 				field := agValue.FieldByIndex([]int{i}).Addr().Interface()
 				if err := execField(field, ctx, ag); err != nil {
 					if err := ag.HandleError(ctx, err); err != nil {
-						return err
+						agError = err
+						break
 					}
 				}
 			}
@@ -104,14 +129,7 @@ func Exec(ag ActionGroup, ctx Context) error {
 			break
 		}
 	}
-
-	if pe, ok := ag.(HasPostExec); ok {
-		if err := pe.PostExec(ctx); err != nil {
-			pe.HandleError(ctx, err)
-			return err
-		}
-	}
-	return nil
+	return agError
 }
 
 func execField(field interface{}, ctx Context, ag ActionGroup) error {
